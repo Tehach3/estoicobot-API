@@ -1,12 +1,7 @@
 import { Module } from '@nestjs/common';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
-import { WhatsappService } from './whatsapp/whatsapp.service';
-import { WhatsappController } from './whatsapp/whatsapp.controller';
+import { WhatsappModule } from './whatsapp/whatsapp.module';
 
 @Module({
-  imports: [],
-  controllers: [AppController, WhatsappController],
-  providers: [AppService, WhatsappService],
+  imports: [WhatsappModule],
 })
 export class AppModule {}
