@@ -1,18 +1,33 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import makeWASocket, { useMultiFileAuthState } from '@whiskeysockets/baileys';
 import { makeInMemoryStore } from '@whiskeysockets/baileys/lib/store';
-import qrcode from 'qrcode-terminal';
+import { debug } from 'console';
+import * as qrcode from 'qrcode-terminal';
+import * as fs from 'fs';
+
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 export class WhatsappService implements OnModuleInit {
   private sock: ReturnType<typeof makeWASocket>;
   private store = makeInMemoryStore({});
+  private started = false;
+
 
   async onModuleInit() {
     await this.start();
   }
 
   async start() {
-    const { state, saveCreds } = await useMultiFileAuthState('./auth');
+    const authDir = './auth';
+    if (this.started) return;
+    this.started = true;
+    console.log('status qr generade ',this.started)
+    
+    if (fs.existsSync(authDir)) {
+      fs.rmSync(authDir, { recursive: true, force: true });
+      console.log('Directorio de autenticación limpiado.');
+    }
+    const { state, saveCreds } = await useMultiFileAuthState(authDir);
 
     this.store.readFromFile('./baileys_store.json');
     setInterval(() => this.store.writeToFile('./baileys_store.json'), 10_000);
@@ -21,6 +36,17 @@ export class WhatsappService implements OnModuleInit {
       auth: state,
       // Aunque pongas esto, en algunas versiones no imprime
       // printQRInTerminal: true,
+    });
+
+    this.sock.ev.on('connection.update', (update) => {
+      const { connection, lastDisconnect, qr } = update;
+    
+      if (connection === 'close') {
+        const error = lastDisconnect?.error;
+        console.error('❌ Se cerró la conexión:', error);
+    
+        // Si querés reintentar o manejar el error de forma automática, podés hacerlo acá.
+      }
     });
 
     this.store.bind(this.sock.ev);
