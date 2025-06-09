@@ -112,18 +112,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.WhatsappService = void 0;
 // src/whatsapp/whatsapp.service.ts
-// ───────────────────────────────────────────────────────────────────
-// Servicio Nest que mantiene un WebSocket de Baileys siempre activo.
-//  • Escucha eventos, imprime el QR y re-conecta si la sesión cae
-//  • Expone un método sendText() que cualquier otro módulo puede inyectar
-//  • Usa Boom para leer el statusCode del cierre de conexión
-// ───────────────────────────────────────────────────────────────────
 var common_1 = require("@nestjs/common");
-var baileys_1 = require("@whiskeysockets/baileys");
-var baileys_2 = __importDefault(require("@whiskeysockets/baileys"));
+var baileys_1 = __importStar(require("@whiskeysockets/baileys"));
 var qrcode = __importStar(require("qrcode-terminal"));
 var pino_1 = __importDefault(require("pino"));
-var makeWASocket = baileys_2.default.default; // ← evita el error “no default export”
+//import Boom = require("@hapi/boom")
 var WhatsappService = function () {
     var _classDecorators = [(0, common_1.Injectable)()];
     var _classDescriptor;
@@ -133,7 +126,6 @@ var WhatsappService = function () {
         function WhatsappService_1() {
             this.log = new common_1.Logger(WhatsappService.name);
         }
-        /* ────────── lifecycle hooks ────────── */
         WhatsappService_1.prototype.onModuleInit = function () {
             return __awaiter(this, void 0, void 0, function () {
                 var _a, state, saveCreds, version;
@@ -147,35 +139,32 @@ var WhatsappService = function () {
                             return [4 /*yield*/, (0, baileys_1.fetchLatestBaileysVersion)()];
                         case 2:
                             version = (_b.sent()).version;
-                            /* 3️⃣  Crea el WebSocket */
-                            this.sock = makeWASocket({
+                            this.sock = (0, baileys_1.default)({
                                 version: version,
                                 auth: state,
                                 printQRInTerminal: false,
                                 logger: (0, pino_1.default)({ level: 'silent' }),
                             });
-                            /* 4️⃣  Guarda credenciales cuando cambian */
                             this.sock.ev.on('creds.update', saveCreds);
-                            /* 5️⃣  Estado de conexión + QR + re-intentos */
                             this.sock.ev.on('connection.update', function (_a) {
                                 var _b, _c;
                                 var connection = _a.connection, lastDisconnect = _a.lastDisconnect, qr = _a.qr;
                                 if (qr)
                                     qrcode.generate(qr, { small: true });
-                                if (connection === 'open') {
+                                if (connection === 'open')
                                     _this.log.log('✅ WhatsApp conectado');
-                                }
                                 if (connection === 'close') {
-                                    /* Boom: obtiene el código HTTP del cierre */
+                                    // Usamos el tipo Boom directamente
+                                    // const code =
+                                    //   (lastDisconnect?.error as (Boom | undefined))?.output
                                     var code = (_c = (_b = lastDisconnect === null || lastDisconnect === void 0 ? void 0 : lastDisconnect.error) === null || _b === void 0 ? void 0 : _b.output) === null || _c === void 0 ? void 0 : _c.statusCode;
+                                    //     ?.statusCode;
                                     var shouldReconnect = code !== baileys_1.DisconnectReason.loggedOut;
-                                    _this.log.warn("Conexi\u00F3n cerrada (".concat(code !== null && code !== void 0 ? code : 'desconocido', "). ") +
-                                        "Reintentar: ".concat(shouldReconnect));
+                                    _this.log.warn("Conexi\u00F3n cerrada (".concat(code !== null && code !== void 0 ? code : 'desconocido', "). Reintentar: ").concat(shouldReconnect));
                                     if (shouldReconnect)
-                                        void _this.onModuleInit(); // reconectar
+                                        void _this.onModuleInit();
                                 }
                             });
-                            /* 6️⃣  Ejemplo: responde “pong” a “!ping” */
                             this.sock.ev.on('messages.upsert', function (_a) {
                                 var _b;
                                 var messages = _a.messages;
@@ -205,7 +194,6 @@ var WhatsappService = function () {
                 });
             });
         };
-        /* ────────── API pública ────────── */
         WhatsappService_1.prototype.sendText = function (jid, text) {
             return this.sock.sendMessage(jid, { text: text });
         };

@@ -1,4 +1,3 @@
-// src/whatsapp/whatsapp.service.ts
 import {
   Injectable,
   Logger,
@@ -15,7 +14,6 @@ import makeWASocket, {
 
 import * as qrcode from 'qrcode-terminal';
 import Pino from 'pino';
-import Boom = require("@hapi/boom")
 
 @Injectable()
 export class WhatsappService implements OnModuleInit, OnModuleDestroy {
@@ -43,12 +41,8 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
         if (qr) qrcode.generate(qr, { small: true });
         if (connection === 'open') this.log.log('✅ WhatsApp conectado');
         if (connection === 'close') {
-          // Usamos el tipo Boom directamente
-          const code =
-            (lastDisconnect?.error as (Boom | undefined))?.output
-              ?.statusCode;
+          const code = (lastDisconnect?.error as any)?.output?.statusCode;
           const shouldReconnect = code !== DisconnectReason.loggedOut;
-
           this.log.warn(
             `Conexión cerrada (${code ?? 'desconocido'}). Reintentar: ${shouldReconnect}`,
           );
@@ -64,6 +58,20 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
       }
     });
   }
+
+  async sendMessageToGroupByName(groupName: string, text: string): Promise<void> {
+  const groups = await this.sock.groupFetchAllParticipating();
+
+  const entry = Object.entries(groups).find(
+    ([, meta]) => meta.subject === groupName
+  );
+  if (!entry) {
+    throw new Error(`No se encontró grupo con nombre "${groupName}"`);
+  }
+  const [groupJid] = entry;
+
+  await this.sock.sendMessage(groupJid, { text });
+}
 
   async onModuleDestroy(): Promise<void> {
     await this.sock?.logout();
